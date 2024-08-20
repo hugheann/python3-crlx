@@ -19,6 +19,7 @@ def match_variable(ds, da_to_merge, method='nearest', max_gap=60 * 2):
     interp = combo.interpolate_na(dim='time', method=method, max_gap=timedelta(seconds=max_gap))
     matching = interp.sel(time=ds.time)
     new_ds = xr.combine_by_coords([ds, matching])
+    new_ds = new_ds.sortby('time')
     return new_ds
 
 
