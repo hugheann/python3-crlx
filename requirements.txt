@@ -1,0 +1,12 @@
+aiohttp
+bottleneck
+fsspec
+gsw
+ipympl
+matplotlib
+netCDF4
+numpy
+pandas
+requests
+scipy
+xarray
