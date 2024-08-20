@@ -13,6 +13,14 @@ REQ_DT_FMT = '%Y-%m-%d %H:%M:%S'
 ENCODING = {'time': {'units': 'nanoseconds since 1900-01-01'}}  # xr.Dataset to netcdf encoding for time
 
 
+def match_variable(ds, da_to_merge, method='nearest', max_gap=60 * 2):
+    ogt = ds[['time']]
+    combo = xr.combine_by_coords([ogt, da_to_merge])
+    interp = combo.interpolate_na(dim='time', method=method, max_gap=timedelta(seconds=max_gap))
+    matching = interp.sel(time=ds.time)
+    new_ds = xr.combine_by_coords([ds, matching])
+    return new_ds
+
 
 class CRLX():
     def __init__(self, base_url: str, verify: bool = True, verbose: bool = False):
