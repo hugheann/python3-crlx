@@ -2,7 +2,7 @@ from datetime import datetime, timezone, timedelta
 import os
 import pandas as pd
 import xarray as xr
-from crlx.vessels.sikuliaq import SIKULIAQ
+from crlx import SIKULIAQ
 
 
 SAVE_DIR_BASE = 'C:/Users/Ian/Box/pco2_skq/data/daily/'
@@ -13,7 +13,7 @@ SENSOR = 'LDEO-TAKAHASHI'
 
 BDT = datetime(2024,7,26).replace(tzinfo = None)
 EDT = datetime.now(timezone.utc).replace(tzinfo = None)
-SKQ = SIKULIAQ()
+SKQ = SIKULIAQ(verbose = True)
 
 
 def main():
@@ -23,6 +23,7 @@ def main():
         bdt = dt.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
         edt = dt + timedelta(hours  = 23, minutes = 59, seconds =59, microseconds = 999999)
         ds = SKQ.get_wet_lab_ldeo(bdt, edt)
+
         if ds is not None:
             save_dir = os.path.join(SAVE_DIR_BASE, f'{VESSEL}_{str(ds.system)}_{str(ds.location)}_{SENSOR}/')
             os.makedirs(save_dir,exist_ok=True)
