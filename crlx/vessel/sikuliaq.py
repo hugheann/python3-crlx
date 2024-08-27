@@ -1,4 +1,6 @@
 from datetime import datetime,timedelta
+import numpy as np
+import warnings
 import xarray as xr
 
 from crlx.core import CRLX
@@ -20,170 +22,129 @@ class SIKULIAQ(CRLX):
         ds = self.get_data('sensor_float_3', bdt, edt)
         return ds
 
-    def get_wet_lab_ldeo(self, bdt: datetime, edt: datetime):
 
-        def recompute_air(ds, barometric_pressure, sst,sal, at):
-            dpaCO2 = CO2()
-            diag = ds[['cell_temperature','gas_flow_rate','source_id']]
-
-            xco2_corr = ds.xco2_corr
-            bp = barometric_pressure * 1000
-            combo = xr.combine_by_coords([xco2_corr, sst, bp, sal,at])
-            combo = combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=10))
-            combo = combo.sel(time=xco2_corr.time)
-            combo['air_water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(combo.sea_surface_temperature,
-                                                                                 combo.sea_water_practical_salinity)
-            combo['air_pco2'] = dpaCO2.calc_pco2(combo.xco2_corr, mbar2atm(combo.barometric_pressure),
-                                                 combo.air_water_vapor_pressure)
-            combo['air_fco2'] = dpaCO2.calc_fugacity(combo.air_pco2, combo.xco2_corr, combo.barometric_pressure,
-                                                     combo.air_temperature)
-            combo = xr.combine_by_coords([combo, diag], combine_attrs='drop_conflicts')
-            return combo
-
-
-        def recompute_sw(ds, barometric_pressure, sst,sal):
-            dpaCO2 = CO2()
-
-
-            diag = ds[['cell_temperature','gas_flow_rate','source_id']]
-
-
-            xco2_corr = ds.xco2_corr
-            bp = barometric_pressure * 1000
-            teq = ds.equilibrator_temperature_sbe38
-            peq = ds.equilibrator_pressure
-
-            combo = xr.combine_by_coords([xco2_corr, sst, bp, sal, teq, peq])
-            combo = combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=10))
-            combo = combo.sel(time=xco2_corr.time)
-            combo['equilibrator_water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(
-                combo.equilibrator_temperature_sbe38, combo.sea_water_practical_salinity)
-            combo['equilibrator_pco2'] = dpaCO2.calc_pco2(combo.xco2_corr, mbar2atm(combo.equilibrator_pressure),
-                                                          combo.equilibrator_water_vapor_pressure)
-            combo['sea_water_pco2'] = dpaCO2.calc_sea_water_pco2_t_corr(combo.equilibrator_pco2,combo.sea_surface_temperature,mbar2atm(combo.barometric_pressure))
-            combo['sea_water_fco2'] = dpaCO2.calc_fugacity(combo.equilibrator_pco2, combo.xco2_corr,
-                                                           combo.barometric_pressure, combo.sea_surface_temperature)
-
-            combo = xr.combine_by_coords([combo, diag], combine_attrs='drop_conflicts')
-            return combo
-
-
-        def reformat_standards(ds):
-            ds = ds[['cell_temperature','gas_flow_rate','source_id','xco2_corr']]
-
-            return ds
-
-
-        met = self.get_met_station(bdt-timedelta(hours = 2), edt +timedelta(hours = 2))[['barometric_pressure','air_temperature']]
-        at = met.air_temperature
-        bp = met.barometric_pressure
-        sst = self.get_centerboard_sbe38(bdt - timedelta(hours=2), edt + timedelta(hours=2)).rename({'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
-        sal = self.get_main_lab_sbe45a(bdt - timedelta(hours=2), edt + timedelta(hours=2))['sea_water_practical_salinity']
-
-
-
-
-        ds = self.get_data('SensorFloat17', bdt, edt)
-        air = ds.where(ds.source_id == 1, drop=True)
-        sw = ds.where(ds.source_id == 0, drop=True)
-        nit = ds.where(ds.source_id == 2, drop=True)
-        sd1 = ds.where(ds.source_id == 4, drop=True)
-        sd2 = ds.where(ds.source_id == 6, drop=True)
-        sd3 = ds.where(ds.source_id == 8, drop=True)
-        sd4 = ds.where(ds.source_id == 10, drop=True)
-        sd5 = ds.where(ds.source_id == 12, drop=True)
-
-        air = recompute_air(air,bp,sst,sal,at)
-        sw = recompute_sw(sw,bp,sst,sal)
-        nit = reformat_standards(nit)
-        sd1 = reformat_standards(sd1)
-        sd2 = reformat_standards(sd2)
-        sd3 = reformat_standards(sd3)
-        sd4 = reformat_standards(sd4)
-        sd5 = reformat_standards(sd5)
-
-        try:
-            cds = xr.combine_by_coords([air, sw, nit, sd1, sd2, sd3, sd4, sd5], combine_attrs='drop_conflicts')
-        except:
-            cds = xr.concat([air, sw, nit, sd1, sd2, sd3, sd4, sd5], combine_attrs='drop_conflicts', dim='time')
-            cds = cds.drop_duplicates(dim='time')
-        return cds
-
-    def get_wet_lab_apollo(self, bdt: datetime, edt: datetime):
-
-        def recompute_air(ds, barometric_pressure, sst,at):
-            dpaCO2 = CO2()
-
-            diag = ds[
-                ['measurement_interval', 'gas_flow_rate', 'cooling_pad_temperature', 'li7815_cavity_pressure',
-                 'li7815_co2_stdev', 'li7815_cavity_temperature',
-                 'li7815_h2o', 'number_of_measurements', 'li7815_diagnostic', 'sample_source','sea_water_temperature','sea_water_practical_salinity','purge_interval']]
-            diag = diag.rename({'sea_water_temperature':'apollo_sbe45_temp',
-                                'sea_water_practical_salinity': 'apollo_sbe45_pracsal'})
-
-            xco2_corr = ds.xco2_corr
-            sal = ds.sea_water_practical_salinity
-            bp = barometric_pressure * 1000
-            combo = xr.combine_by_coords([xco2_corr, sst, bp, sal,at])
-            combo = combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=10))
-            combo = combo.sel(time=xco2_corr.time)
-            combo['air_water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(combo.sea_surface_temperature,
-                                                                                 combo.sea_water_practical_salinity)
-            combo['air_pco2'] = dpaCO2.calc_pco2(combo.xco2_corr, mbar2atm(combo.barometric_pressure),
-                                                 combo.air_water_vapor_pressure)
-            combo['air_fco2'] = dpaCO2.calc_fugacity(combo.air_pco2, combo.xco2_corr, combo.barometric_pressure,
-                                                     combo.air_temperature)
-
-            combo = xr.combine_by_coords([combo, diag], combine_attrs='drop_conflicts')
-            return combo
-
-
-        def recompute_sw(ds, barometric_pressure, sst):
-            dpaCO2 = CO2()
-
-
-            diag = ds[
-                ['measurement_interval', 'gas_flow_rate', 'cooling_pad_temperature', 'li7815_cavity_pressure',
-                 'li7815_co2_stdev', 'li7815_cavity_temperature',
-                 'li7815_h2o', 'number_of_measurements', 'li7815_diagnostic', 'sample_source','sea_water_temperature','sea_water_practical_salinity','purge_interval']]
-            diag = diag.rename({'sea_water_temperature':'apollo_sbe45_temp',
-                                'sea_water_practical_salinity': 'apollo_sbe45_pracsal'})
-
-            xco2_corr = ds.xco2_corr
-            sal = ds.sea_water_practical_salinity
-            bp = barometric_pressure * 1000
-            teq = ds.equilibrator_temperature
-            peq = ds.equilibrator_pressure
-
-            combo = xr.combine_by_coords([xco2_corr, sst, bp, sal, teq, peq])
-            combo = combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=10))
-            combo = combo.sel(time=xco2_corr.time)
-            combo['equilibrator_water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(
-                combo.equilibrator_temperature, combo.sea_water_practical_salinity)
-            combo['equilibrator_pco2'] = dpaCO2.calc_pco2(combo.xco2_corr, mbar2atm(combo.equilibrator_pressure),
-                                                          combo.equilibrator_water_vapor_pressure)
-            combo['sea_water_pco2'] = dpaCO2.calc_sea_water_pco2_t_corr(combo.equilibrator_pco2,combo.sea_surface_temperature,mbar2atm(combo.barometric_pressure))
-            combo['sea_water_fco2'] = dpaCO2.calc_fugacity(combo.equilibrator_pco2, combo.xco2_corr,
-                                                           combo.barometric_pressure, combo.sea_surface_temperature)
-
-            combo = xr.combine_by_coords([combo, diag], combine_attrs='drop_conflicts')
-            return combo
-
-        def reformat_standards(ds):
-            ds = ds[
-                ['measurement_interval', 'gas_flow_rate', 'cooling_pad_temperature', 'li7815_cavity_pressure',
-                 'li7815_co2_stdev', 'li7815_cavity_temperature',
-                 'li7815_h2o', 'number_of_measurements', 'li7815_diagnostic', 'sample_source','li7815_xco2']]
-            return ds
-
-        ds = self.get_data('sensor_mixlg_11', bdt, edt)
+    def get_wet_lab_ldeo(self,bdt, edt, max_interp_gap: int = 60):
+        ds = self.get_data('SensorFloat17', bdt=bdt, edt=edt)
         if ds is not None:
-            ds = ds.rename({'sea_water_conductivity': 'sea_water_electrical_conductivity'})
+            ds = ds.drop_vars(['t_eq_rtd_bad', 'pco2'], errors='ignore')
+
+            ovs = [dv for dv in ds.data_vars if ds[dv].dtype == 'O']
+            for ov in ovs:
+                if ov in ['sensor_id']:
+                    continue
+                ds[ov] = ds[ov].where((ds[ov] is None), np.nan).astype(float)
+
+            air = ds.where(ds.source_id == 1, drop=True)
+            sw = ds.where(ds.source_id == 0, drop=True)
+            nit = ds.where(ds.source_id == 2, drop=True)
+            sd1 = ds.where(ds.source_id == 4, drop=True)
+            sd2 = ds.where(ds.source_id == 6, drop=True)
+            sd3 = ds.where(ds.source_id == 8, drop=True)
+            sd4 = ds.where(ds.source_id == 10, drop=True)
+            sd5 = ds.where(ds.source_id == 12, drop=True)
+
+            met = self.get_met_station(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                ['barometric_pressure', 'air_temperature']]
+            airt = met.air_temperature
+            barop = met.barometric_pressure * 1000
+            sst = self.get_centerboard_sbe38(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2)).rename(
+                {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
+            pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                'sea_water_practical_salinity']
+
+            dpaCO2 = CO2()
+
+            # Recompute Air
+            air_diag = air[['cell_temperature', 'gas_flow_rate']]
+            air_xco2 = air.xco2_corr
+            air_combo = xr.combine_by_coords([air_xco2, sst, barop, pracsal, airt])
+            air_combo = air_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
+            air_combo = air_combo.sel(time=air_xco2.time)
+            air_combo['xco2_corr'] = air_xco2
+            air_combo['water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(air_combo.sea_surface_temperature,
+                                                                                 air_combo.sea_water_practical_salinity)
+            air_combo['pco2'] = dpaCO2.calc_pco2(air_combo.xco2_corr, mbar2atm(air_combo.barometric_pressure),
+                                                 air_combo.water_vapor_pressure)
+            air_combo['fco2'] = dpaCO2.calc_fugacity(air_combo.pco2, air_combo.xco2_corr, air_combo.barometric_pressure,
+                                                     air_combo.air_temperature)
+            air_combo = xr.combine_by_coords([air_combo, air_diag], combine_attrs='drop_conflicts')
+            air_combo = air_combo.expand_dims(sample_source=['air'], axis=1)
+
+            # Recompute Seawater
+            sw_diag = sw[['cell_temperature', 'gas_flow_rate']]
+            sw_xco2 = sw.xco2_corr
+            teq = sw.equilibrator_temperature_sbe38
+            peq = sw.equilibrator_pressure
+            sw_combo = xr.combine_by_coords([sw_xco2, sst, barop, pracsal, teq, peq])
+            sw_combo = sw_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
+            sw_combo = sw_combo.sel(time=sw_xco2.time)
+            sw_combo['xco2_corr'] = sw_xco2
+            sw_combo['water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(sw_combo.equilibrator_temperature_sbe38,
+                                                                                sw_combo.sea_water_practical_salinity)
+            sw_combo['equilibrator_pco2'] = dpaCO2.calc_pco2(sw_combo.xco2_corr, mbar2atm(sw_combo.equilibrator_pressure),
+                                                             sw_combo.water_vapor_pressure)
+            sw_combo['pco2'] = dpaCO2.calc_sea_water_pco2_t_corr(sw_combo.equilibrator_pco2,
+                                                                 sw_combo.sea_surface_temperature,
+                                                                 mbar2atm(sw_combo.barometric_pressure))
+            sw_combo['fco2'] = dpaCO2.calc_fugacity(sw_combo.pco2, sw_combo.xco2_corr, sw_combo.barometric_pressure,
+                                                    sw_combo.sea_surface_temperature)
+            sw_combo = xr.combine_by_coords([sw_combo, sw_diag], combine_attrs='drop_conflicts')
+            sw_combo = sw_combo.expand_dims(sample_source=['seawater'], axis=1)
+
+            sdvars = ['cell_temperature', 'gas_flow_rate', 'xco2_corr']
+
+            nit = nit[sdvars]
+            nit = nit.expand_dims(sample_source=['nitrogen'], axis=1)
+
+            sd1 = sd1[sdvars]
+            sd1 = sd1.expand_dims(sample_source=['sd1'], axis=1)
+
+            sd2 = sd2[sdvars]
+            sd2 = sd2.expand_dims(sample_source=['sd2'], axis=1)
+
+            sd3 = sd3[sdvars]
+            sd3 = sd3.expand_dims(sample_source=['sd3'], axis=1)
+
+            sd4 = sd4[sdvars]
+            sd4 = sd4.expand_dims(sample_source=['sd4'], axis=1)
+
+            sd5 = sd5[sdvars]
+            sd5 = sd5.expand_dims(sample_source=['sd5'], axis=1)
+
+            try:
+                combo = xr.combine_by_coords([air_combo, sw_combo, nit, sd1, sd2, sd3, sd4, sd5],
+                                             combine_attrs='drop_conflicts')
+            except:
+                combo = xr.concat([air_combo, sw_combo, nit, sd1, sd2, sd3, sd4, sd5], dim='time',
+                                  combine_attrs='drop_conflicts')
+                combo = combo.drop_duplicates(dim='time')
+            combo = combo[sorted(combo.data_vars)]
+            return combo
+        else:
+            if self._verbose is True:
+                warnings.warn(f'No Data {bdt}- {edt}')
+            return None
+
+
+    def get_wet_lab_apollo(self,bdt, edt, max_interp_gap: int = 60):
+        ds = self.get_data('sensor_mixlg_11', bdt=bdt, edt=edt)
+        if ds is not None:
+            ds['equilibrator_temperature_sbe45'] = ds.sea_water_temperature
+            ds = ds.rename({'sea_water_conductivity': 'apollo_sbe45_sea_water_electrical_conductivity',
+                            'sea_water_practical_salinity': 'apollo_sbe45_sea_water_practical_salinity',
+                            'sea_water_temperature': 'apollo_sbe45_sea_water_temperature'})
+
             ds = ds.drop_vars(['gps_latitude',
                                'gps_longitude',
                                'operator',
-                               'gps_datetime'],errors = 'ignore')
+                               'gps_datetime'], errors='ignore')
 
+            ovs = [dv for dv in ds.data_vars if ds[dv].dtype == 'O']
+            for ov in ovs:
+                if ov in ['sample_source', 'instrument_mode', 'instrument_timestamp', 'overflow_alarm',
+                          'shutoff_valve_alarm', 'test_type', 'sensor_id']:
+                    continue
+                ds[ov] = ds[ov].where((ds[ov] is None), np.nan).astype(float)
 
             air = ds.where(ds.sample_source.str.contains('Air'), drop=True)
             sw = ds.where(ds.sample_source.str.contains('Seawater'), drop=True)
@@ -193,27 +154,97 @@ class SIKULIAQ(CRLX):
             sd4 = ds.where(ds.sample_source.str.contains('SD-4'), drop=True)
             sd5 = ds.where(ds.sample_source.str.contains('SD-5'), drop=True)
 
-            met = self.get_met_station(bdt-timedelta(hours = 2), edt +timedelta(hours = 2))[['barometric_pressure','air_temperature']]
-            at = met.air_temperature
-            bp = met.barometric_pressure
-            sst = self.get_centerboard_sbe38(bdt - timedelta(hours=2), edt + timedelta(hours=2)).rename({'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
+            met = self.get_met_station(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                ['barometric_pressure', 'air_temperature']]
+            airt = met.air_temperature
+            barop = met.barometric_pressure * 1000
+            sst = self.get_centerboard_sbe38(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2)).rename(
+                {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
+            pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                'sea_water_practical_salinity']
 
-            air = recompute_air(air, bp, sst, at)
-            sw = recompute_sw(sw, bp, sst)
-            sd1 = reformat_standards(sd1)
-            sd2 = reformat_standards(sd2)
-            sd3 = reformat_standards(sd3)
-            sd4 = reformat_standards(sd4)
-            sd5 = reformat_standards(sd5)
+            dpaCO2 = CO2()
+
+            # Recompute Air
+            air_diag = air[['cooling_pad_temperature', 'gas_flow_rate', 'instrument_mode', 'instrument_timestamp',
+                            'li7815_cavity_pressure', 'li7815_cavity_temperature', 'li7815_diagnostic', 'li7815_h2o',
+                            'li7815_xco2', 'li7815_xco2_stdev', 'measurement_flow_rate', 'measurement_interval',
+                            'measurement_stdev', 'number_of_measurements', 'overflow_alarm', 'purge_flow_rate',
+                            'purge_interval', 'shutoff_valve_alarm', 'test_type']]
+            air_xco2 = air.xco2_corr
+            air_combo = xr.combine_by_coords([air_xco2, sst, barop, pracsal, airt])
+            air_combo = air_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
+            air_combo = air_combo.sel(time=air_xco2.time)
+            air_combo['xco2_corr'] = air_xco2
+
+            air_combo['water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(air_combo.sea_surface_temperature,
+                                                                                 air_combo.sea_water_practical_salinity)
+            air_combo['pco2'] = dpaCO2.calc_pco2(air_combo.xco2_corr, mbar2atm(air_combo.barometric_pressure),
+                                                 air_combo.water_vapor_pressure)
+            air_combo['fco2'] = dpaCO2.calc_fugacity(air_combo.pco2, air_combo.xco2_corr, air_combo.barometric_pressure,
+                                                     air_combo.air_temperature)
+            air_combo = xr.combine_by_coords([air_combo, air_diag], combine_attrs='drop_conflicts')
+            air_combo = air_combo.expand_dims(sample_source=['air'], axis=1)
+
+            # Recompute Seawater
+            sw_diag = sw[['cooling_pad_temperature', 'equilibrator_temperature', 'gas_flow_rate', 'instrument_mode',
+                          'instrument_timestamp', 'li7815_cavity_pressure', 'li7815_cavity_temperature',
+                          'li7815_diagnostic', 'li7815_h2o', 'li7815_xco2', 'li7815_xco2_stdev', 'measurement_flow_rate',
+                          'measurement_interval', 'measurement_stdev', 'number_of_measurements', 'overflow_alarm',
+                          'purge_flow_rate', 'purge_interval', 'apollo_sbe45_sea_water_electrical_conductivity',
+                          'apollo_sbe45_sea_water_practical_salinity', 'apollo_sbe45_sea_water_temperature',
+                          'shutoff_valve_alarm', 'test_type', 'water_flow_rate']]
+            sw_xco2 = sw.xco2_corr
+            teq = sw.equilibrator_temperature_sbe45
+            peq = sw.equilibrator_pressure
+            sw_combo = xr.combine_by_coords([sw_xco2, sst, barop, pracsal, teq, peq])
+            sw_combo = sw_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
+            sw_combo = sw_combo.sel(time=sw_xco2.time)
+            sw_combo['xco2_corr'] = sw_xco2
+            sw_combo['water_vapor_pressure'] = dpaCO2.calc_water_vapor_pressure(sw_combo.equilibrator_temperature_sbe45,
+                                                                                sw_combo.sea_water_practical_salinity)
+            sw_combo['equilibrator_pco2'] = dpaCO2.calc_pco2(sw_combo.xco2_corr, mbar2atm(sw_combo.equilibrator_pressure),
+                                                             sw_combo.water_vapor_pressure)
+            sw_combo['pco2'] = dpaCO2.calc_sea_water_pco2_t_corr(sw_combo.equilibrator_pco2,
+                                                                 sw_combo.sea_surface_temperature,
+                                                                 mbar2atm(sw_combo.barometric_pressure))
+            sw_combo['fco2'] = dpaCO2.calc_fugacity(sw_combo.pco2, sw_combo.xco2_corr, sw_combo.barometric_pressure,
+                                                    sw_combo.sea_surface_temperature)
+            sw_combo = xr.combine_by_coords([sw_combo, sw_diag], combine_attrs='drop_conflicts')
+            sw_combo = sw_combo.expand_dims(sample_source=['seawater'], axis=1)
+
+            sdvars = ['measurement_interval', 'gas_flow_rate', 'cooling_pad_temperature', 'li7815_cavity_pressure',
+                      'li7815_xco2_stdev', 'li7815_cavity_temperature', 'li7815_h2o', 'number_of_measurements',
+                      'li7815_diagnostic', 'li7815_xco2', 'instrument_mode', 'instrument_timestamp',
+                      'measurement_flow_rate', 'measurement_stdev', 'purge_interval', 'purge_flow_rate', 'test_type']
+
+            sd1 = sd1[sdvars]
+            sd1 = sd1.expand_dims(sample_source=['sd1'], axis=1)
+
+            sd2 = sd2[sdvars]
+            sd2 = sd2.expand_dims(sample_source=['sd2'], axis=1)
+
+            sd3 = sd3[sdvars]
+            sd3 = sd3.expand_dims(sample_source=['sd3'], axis=1)
+
+            sd4 = sd4[sdvars]
+            sd4 = sd4.expand_dims(sample_source=['sd4'], axis=1)
+
+            sd5 = sd5[sdvars]
+            sd5 = sd5.expand_dims(sample_source=['sd5'], axis=1)
 
             try:
-                cds = xr.combine_by_coords([air, sw, sd1, sd2, sd3, sd4, sd5], combine_attrs = 'drop_conflicts')
+                combo = xr.combine_by_coords([air_combo, sw_combo, sd1, sd2, sd3, sd4, sd5], combine_attrs = 'drop_conflicts')
             except:
-                cds = xr.concat([air, sw, sd1, sd2, sd3, sd4, sd5], combine_attrs = 'drop_conflicts',dim = 'time')
-                cds = cds.drop_duplicates(dim = 'time')
-            cds = cds[sorted(cds.data_vars)]
+                combo = xr.concat([air_combo, sw_combo, sd1, sd2, sd3, sd4, sd5], combine_attrs = 'drop_conflicts', dim = 'time')
+                combo = combo.drop_duplicates(dim = 'time')
+            combo = combo[sorted(combo.data_vars)]
+            return combo
+        else:
+            if self._verbose is True:
+                warnings.warn(f'No Data {bdt}- {edt}')
+            return None
 
-        return cds
 
     def get_centerboard_sbe38(self, bdt: datetime, edt: datetime):
         ds = self.get_data('sensor_float_6', bdt, edt)
