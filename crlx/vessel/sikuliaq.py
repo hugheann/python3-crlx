@@ -51,13 +51,17 @@ class SIKULIAQ(CRLX):
                 {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
             pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
                 'sea_water_practical_salinity']
+            gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                ['latitude', 'longitude']]
+            lat = gps.latitude
+            lon = gps.longitude
 
             dpaCO2 = CO2()
 
             # Recompute Air
             air_diag = air[['cell_temperature', 'gas_flow_rate']]
             air_xco2 = air.xco2_corr
-            air_combo = xr.combine_by_coords([air_xco2, sst, barop, pracsal, airt])
+            air_combo = xr.combine_by_coords([air_xco2, sst, barop, pracsal, airt,lat, lon])
             air_combo = air_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
             air_combo = air_combo.sel(time=air_xco2.time)
             air_combo['xco2_corr'] = air_xco2
@@ -75,7 +79,7 @@ class SIKULIAQ(CRLX):
             sw_xco2 = sw.xco2_corr
             teq = sw.equilibrator_temperature_sbe38
             peq = sw.equilibrator_pressure
-            sw_combo = xr.combine_by_coords([sw_xco2, sst, barop, pracsal, teq, peq])
+            sw_combo = xr.combine_by_coords([sw_xco2, sst, barop, pracsal, teq, peq,lat,lon])
             sw_combo = sw_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
             sw_combo = sw_combo.sel(time=sw_xco2.time)
             sw_combo['xco2_corr'] = sw_xco2
@@ -162,6 +166,9 @@ class SIKULIAQ(CRLX):
                 {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
             pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
                 'sea_water_practical_salinity']
+            gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
+            lat = gps.latitude
+            lon = gps.longitude
 
             dpaCO2 = CO2()
 
@@ -172,7 +179,7 @@ class SIKULIAQ(CRLX):
                             'measurement_stdev', 'number_of_measurements', 'overflow_alarm', 'purge_flow_rate',
                             'purge_interval', 'shutoff_valve_alarm', 'test_type']]
             air_xco2 = air.xco2_corr
-            air_combo = xr.combine_by_coords([air_xco2, sst, barop, pracsal, airt])
+            air_combo = xr.combine_by_coords([air_xco2, sst, barop, pracsal, airt, lat, lon])
             air_combo = air_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
             air_combo = air_combo.sel(time=air_xco2.time)
             air_combo['xco2_corr'] = air_xco2
@@ -197,7 +204,7 @@ class SIKULIAQ(CRLX):
             sw_xco2 = sw.xco2_corr
             teq = sw.equilibrator_temperature_sbe45
             peq = sw.equilibrator_pressure
-            sw_combo = xr.combine_by_coords([sw_xco2, sst, barop, pracsal, teq, peq])
+            sw_combo = xr.combine_by_coords([sw_xco2, sst, barop, pracsal, teq, peq,lat,lon])
             sw_combo = sw_combo.interpolate_na(dim='time', method='nearest', max_gap=timedelta(seconds=max_interp_gap))
             sw_combo = sw_combo.sel(time=sw_xco2.time)
             sw_combo['xco2_corr'] = sw_xco2
