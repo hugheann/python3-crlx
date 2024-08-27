@@ -152,6 +152,10 @@ class CRLX():
 
         ds['time'].attrs['description'] = 'Datetime in UTC.'
 
+
+        ds = ds.sortby('time')
+
+        ds = ds[sorted(ds.data_vars)]
         return ds
 
 
