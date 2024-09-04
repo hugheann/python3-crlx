@@ -2,6 +2,7 @@ aiohttp
 bottleneck
 fsspec
 gsw
+ipykernel
 ipympl
 matplotlib
 netCDF4

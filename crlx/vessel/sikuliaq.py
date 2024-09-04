@@ -123,6 +123,7 @@ class SIKULIAQ(CRLX):
                                   combine_attrs='drop_conflicts')
                 combo = combo.drop_duplicates(dim='time')
             combo = combo[sorted(combo.data_vars)]
+            combo = combo.sortby('time')
             return combo
         else:
             if self._verbose is True:
@@ -246,6 +247,7 @@ class SIKULIAQ(CRLX):
                 combo = xr.concat([air_combo, sw_combo, sd1, sd2, sd3, sd4, sd5], combine_attrs = 'drop_conflicts', dim = 'time')
                 combo = combo.drop_duplicates(dim = 'time')
             combo = combo[sorted(combo.data_vars)]
+            combo = combo.sortby('time')
             return combo
         else:
             if self._verbose is True:
