@@ -139,7 +139,10 @@ class CRLX():
                 pass
 
             # Add sensor attributes to root dataset.
-            sensor_metadata = self.get_sensor_info(sensor_id)
+            try:
+                sensor_metadata = self.get_sensor_info(sensor_id)
+            except:
+                sensor_metadata = self.get_sensor_info(sensor_id, enabled = False)
             for smv in sensor_metadata.data_vars:
                 _ds.attrs[smv] = str(sensor_metadata[smv].values[0])
 
