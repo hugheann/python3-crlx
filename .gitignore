@@ -166,5 +166,9 @@ __scratch__/
 
 scratch
 scratch/
+_scratch
+_scratch/
+*.jpg
+*.png
 
 .venv/
