@@ -371,3 +371,8 @@ class SIKULIAQ(CRLX):
     def get_flowmeter_1(self, bdt: datetime, edt: datetime):
         ds = self.get_data('sensor_float_10', bdt, edt)
         return ds
+
+
+    def get_ssst(self, bdt: datetime, edt: datetime):
+        ds = self.get_data('SensorFloat11', bdt, edt)
+        return ds
