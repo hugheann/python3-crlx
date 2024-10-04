@@ -93,7 +93,7 @@ class CRLX():
             return None
 
         df = pd.DataFrame(request_data)
-        df['time'] = pd.to_datetime(df['datetime_corrected'], format='mixed').dt.tz_localize(None)
+        df['time'] = pd.to_datetime(df['time'], format='mixed').dt.tz_localize(None)
         df.index = df.time
         ds = df.to_xarray()
         ds['sensor_id'] = ds['sensor_id'].astype(str)
