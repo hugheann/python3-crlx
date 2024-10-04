@@ -1,6 +1,5 @@
 aiohttp
 bottleneck
-geopy
 fsspec
 gsw
 jupyter

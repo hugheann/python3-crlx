@@ -70,13 +70,19 @@ class SIKULIAQ(CRLX):
 
             try:
                 gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
-                lat = gps.latitude
-                lon = gps.longitude
+                if gps is not None:
+                    lat = gps.latitude
+                    lon = gps.longitude
+                else:
+                    gps = self.get_gps_cnav(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
+                    lat = gps.latitude
+                    lon = gps.longitude
             except:
                 lat = xr.full_like(ds.xco2_corr,np.nan)
                 lat = lat.rename('latitude')
                 lon = xr.full_like(ds.xco2_corr,np.nan)
                 lon = lon.rename('longitude')
+
 
 
             dpaCO2 = CO2()
@@ -209,8 +215,13 @@ class SIKULIAQ(CRLX):
 
             try:
                 gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
-                lat = gps.latitude
-                lon = gps.longitude
+                if gps is not None:
+                    lat = gps.latitude
+                    lon = gps.longitude
+                else:
+                    gps = self.get_gps_cnav(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
+                    lat = gps.latitude
+                    lon = gps.longitude
             except:
                 lat = xr.full_like(ds.xco2_corr,np.nan)
                 lat = lat.rename('latitude')
@@ -317,7 +328,8 @@ class SIKULIAQ(CRLX):
 
     def get_gps_gga_bow(self, bdt: datetime, edt: datetime):
         ds = self.get_data('gnss_gga_bow', bdt, edt)
-        ds = ds.drop_vars(['geo_point'], errors = 'ignore')
+        if ds is not None:
+            ds = ds.drop_vars(['geo_point'], errors = 'ignore')
         return ds
 
 
@@ -375,4 +387,10 @@ class SIKULIAQ(CRLX):
 
     def get_ssst(self, bdt: datetime, edt: datetime):
         ds = self.get_data('SensorFloat11', bdt, edt)
+        return ds
+
+    def get_gps_cnav(self, bdt: datetime, edt: datetime):
+        ds = self.get_data('sensor_mixed_8', bdt, edt)
+        if ds is not None:
+            ds = ds.drop_vars(['geo_point'], errors = 'ignore')
         return ds
