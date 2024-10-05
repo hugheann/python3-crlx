@@ -163,12 +163,14 @@ cython_debug/
 # Custom
 __scratch__
 __scratch__/
-
 scratch
 scratch/
 _scratch
 _scratch/
+_scratch_
+_scratch_/
 *.jpg
 *.png
+_scratch/scratch.ipynb
 
 .venv/

@@ -93,7 +93,7 @@ class CRLX():
             return None
 
         df = pd.DataFrame(request_data)
-        df['time'] = pd.to_datetime(df['datetime_corrected'], format='mixed').dt.tz_localize(None)
+        df['time'] = pd.to_datetime(df['time'], format='mixed').dt.tz_localize(None)
         df.index = df.time
         ds = df.to_xarray()
         ds['sensor_id'] = ds['sensor_id'].astype(str)
@@ -152,13 +152,15 @@ class CRLX():
             _ds.attrs['system'] = system
             _ds.attrs['location'] = location
             datasets.append(_ds)
-        ds = xr.combine_by_coords(datasets, combine_attrs='drop_conflicts')
+        try:
+            ds = xr.combine_by_coords(datasets, combine_attrs='drop_conflicts')
+        except:
+            ds = xr.concat(datasets, dim = 'time', combine_attrs = 'drop_conflicts')
 
-        ds['time'].attrs['description'] = 'Datetime in UTC.'
-
-
+        ds = ds.drop_duplicates(dim = 'time')
         ds = ds.sortby('time')
 
+        ds['time'].attrs['description'] = 'Datetime in UTC.'
         ds = ds[sorted(ds.data_vars)]
         return ds
 

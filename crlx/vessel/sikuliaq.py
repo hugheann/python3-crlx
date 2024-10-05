@@ -43,18 +43,47 @@ class SIKULIAQ(CRLX):
             sd4 = ds.where(ds.source_id == 10, drop=True)
             sd5 = ds.where(ds.source_id == 12, drop=True)
 
-            met = self.get_met_station(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
-                ['barometric_pressure', 'air_temperature']]
-            airt = met.air_temperature
-            barop = met.barometric_pressure * 1000
-            sst = self.get_centerboard_sbe38(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2)).rename(
-                {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
-            pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
-                'sea_water_practical_salinity']
-            gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
-                ['latitude', 'longitude']]
-            lat = gps.latitude
-            lon = gps.longitude
+            try:
+                met = self.get_met_station(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                    ['barometric_pressure', 'air_temperature']]
+                airt = met.air_temperature
+                barop = met.barometric_pressure * 1000
+            except:
+                airt = xr.full_like(ds.xco2_corr, np.nan)
+                airt = airt.rename('air_temperature')
+                barop = xr.full_like(ds.xco2_corr, np.nan)
+                barop = barop.rename('barometric_pressure')
+
+            try:
+                sst = self.get_centerboard_sbe38(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2)).rename(
+                    {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
+            except:
+                sst = xr.full_like(ds.xco2_corr,np.nan)
+                sst = sst.rename('sea_surface_temperature')
+
+            try:
+                pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                    'sea_water_practical_salinity']
+            except:
+                pracsal = xr.full_like(ds.xco2_corr,np.nan)
+                pracsal = pracsal.rename('sea_water_practical_salinity')
+
+            try:
+                gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
+                if gps is not None:
+                    lat = gps.latitude
+                    lon = gps.longitude
+                else:
+                    gps = self.get_gps_cnav(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
+                    lat = gps.latitude
+                    lon = gps.longitude
+            except:
+                lat = xr.full_like(ds.xco2_corr,np.nan)
+                lat = lat.rename('latitude')
+                lon = xr.full_like(ds.xco2_corr,np.nan)
+                lon = lon.rename('longitude')
+
+
 
             dpaCO2 = CO2()
 
@@ -159,17 +188,47 @@ class SIKULIAQ(CRLX):
             sd4 = ds.where(ds.sample_source.str.contains('SD-4'), drop=True)
             sd5 = ds.where(ds.sample_source.str.contains('SD-5'), drop=True)
 
-            met = self.get_met_station(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
-                ['barometric_pressure', 'air_temperature']]
-            airt = met.air_temperature
-            barop = met.barometric_pressure * 1000
-            sst = self.get_centerboard_sbe38(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2)).rename(
-                {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
-            pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
-                'sea_water_practical_salinity']
-            gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
-            lat = gps.latitude
-            lon = gps.longitude
+            try:
+                met = self.get_met_station(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                    ['barometric_pressure', 'air_temperature']]
+                airt = met.air_temperature
+                barop = met.barometric_pressure * 1000
+            except:
+                airt = xr.full_like(ds.xco2_corr, np.nan)
+                airt = airt.rename('air_temperature')
+                barop = xr.full_like(ds.xco2_corr, np.nan)
+                barop = barop.rename('barometric_pressure')
+
+            try:
+                sst = self.get_centerboard_sbe38(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2)).rename(
+                    {'sea_water_temperature': 'sea_surface_temperature'})['sea_surface_temperature']
+            except:
+                sst = xr.full_like(ds.xco2_corr,np.nan)
+                sst = sst.rename('sea_surface_temperature')
+
+            try:
+                pracsal = self.get_main_lab_sbe45a(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[
+                    'sea_water_practical_salinity']
+            except:
+                pracsal = xr.full_like(ds.xco2_corr,np.nan)
+                pracsal = pracsal.rename('sea_water_practical_salinity')
+
+            try:
+                gps = self.get_gps_gga_bow(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
+                if gps is not None:
+                    lat = gps.latitude
+                    lon = gps.longitude
+                else:
+                    gps = self.get_gps_cnav(bdt - timedelta(seconds=3600 * 2), edt + timedelta(seconds=3600 * 2))[['latitude','longitude']]
+                    lat = gps.latitude
+                    lon = gps.longitude
+            except:
+                lat = xr.full_like(ds.xco2_corr,np.nan)
+                lat = lat.rename('latitude')
+                lon = xr.full_like(ds.xco2_corr,np.nan)
+                lon = lon.rename('longitude')
+
+
 
             dpaCO2 = CO2()
 
@@ -269,7 +328,8 @@ class SIKULIAQ(CRLX):
 
     def get_gps_gga_bow(self, bdt: datetime, edt: datetime):
         ds = self.get_data('gnss_gga_bow', bdt, edt)
-        ds = ds.drop_vars(['geo_point'], errors = 'ignore')
+        if ds is not None:
+            ds = ds.drop_vars(['geo_point'], errors = 'ignore')
         return ds
 
 
@@ -322,4 +382,15 @@ class SIKULIAQ(CRLX):
 
     def get_flowmeter_1(self, bdt: datetime, edt: datetime):
         ds = self.get_data('sensor_float_10', bdt, edt)
+        return ds
+
+
+    def get_ssst(self, bdt: datetime, edt: datetime):
+        ds = self.get_data('SensorFloat11', bdt, edt)
+        return ds
+
+    def get_gps_cnav(self, bdt: datetime, edt: datetime):
+        ds = self.get_data('sensor_mixed_8', bdt, edt)
+        if ds is not None:
+            ds = ds.drop_vars(['geo_point'], errors = 'ignore')
         return ds
